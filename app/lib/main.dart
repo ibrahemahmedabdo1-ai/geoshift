@@ -40,6 +40,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   LatLng _target = const LatLng(30.0444, 31.2357);
   LatLng _current = const LatLng(30.0444, 31.2357);
   bool _active = false;
+  bool _locked = false;
   bool _ready = true;
   bool _mapReady = false;
   bool _searching = false;
@@ -120,14 +121,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (mounted) {
       setState(() {
         _active = false;
+        _locked = false;
         _stick = Offset.zero;
       });
     }
   }
 
+  void _toggleLock() {
+    setState(() {
+      _locked = !_locked;
+      _stick = Offset.zero;
+    });
+    if (_locked) _send();
+    _snack(_locked ? 'الموقع مثبّت' : 'تم فك التثبيت');
+  }
+
   void _tick() {
     final mag = _stick.distance;
-    if (!_active || mag < 0.05) return;
+    if (!_active || _locked || mag < 0.05) return;
     final mps = _kmh / 3.6 * mag;
     final d = mps * 0.5;
     final b = math.atan2(_stick.dx, -_stick.dy);
@@ -146,6 +157,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   void _pick(LatLng p, {double? zoom}) {
+    if (_active && _locked) {
+      _snack('الموقع مثبّت، فك التثبيت الأول');
+      return;
+    }
     setState(() {
       _target = p;
       _results = [];
@@ -259,7 +274,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 height: 48,
                 alignment: Alignment.topCenter,
                 child: Icon(Icons.location_pin,
-                    size: 48, color: _active ? Colors.green : Colors.red),
+                    size: 48,
+                    color: !_active
+                        ? Colors.red
+                        : (_locked ? Colors.blue : Colors.green)),
               ),
             ]),
           ],
@@ -332,7 +350,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                if (_active)
+                if (_active && !_locked)
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Joystick(onChanged: (v) => _stick = v),
@@ -369,6 +387,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             tooltip: 'المفضلة',
                             onPressed: _showFavorites,
                             icon: const Icon(Icons.list)),
+                        if (_active)
+                          IconButton.outlined(
+                              tooltip: _locked ? 'فك التثبيت' : 'تثبيت',
+                              onPressed: _toggleLock,
+                              icon: Icon(_locked ? Icons.lock : Icons.lock_open)),
                         const SizedBox(width: 8),
                         Expanded(
                           child: FilledButton.icon(
