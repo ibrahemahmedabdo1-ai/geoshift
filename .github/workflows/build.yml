@@ -1,0 +1,31 @@
+name: Build APK
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - name: Generate Flutter scaffold and apply sources
+        run: |
+          flutter create --org com.geoshift --project-name geoshift --platforms android gen
+          cp -r app/lib/. gen/lib/
+          cp app/pubspec.yaml gen/pubspec.yaml
+          cp app/android_overlay/AndroidManifest.xml gen/android/app/src/main/AndroidManifest.xml
+          cp app/android_overlay/*.kt gen/android/app/src/main/kotlin/com/geoshift/geoshift/
+          rm -rf gen/test
+      - name: Analyze and build
+        working-directory: gen
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GeoShift-apk
+          path: gen/build/app/outputs/flutter-apk/app-release.apk
